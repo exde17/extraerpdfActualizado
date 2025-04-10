@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conversor de PDF a Texto con Soporte de Tablas</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .features {
+            margin-top: 30px;
+            background-color: #f0f8ff;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .features h3 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        .features ul {
+            padding-left: 20px;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .upload-area {
+            border: 2px dashed #3498db;
+            border-radius: 5px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-area:hover {
+            background-color: #f0f8ff;
+        }
+        .upload-area.highlight {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
+        }
+        .upload-area p {
+            margin: 10px 0 0;
+            color: #7f8c8d;
+        }
+        #fileInput {
+            display: none;
+        }
+        .btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        .btn:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .loading {
+            background-color: #e2f3f5;
+            color: #0c5460;
+        }
+        .file-info {
+            margin-top: 15px;
+            font-size: 14px;
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top-color: #3498db;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Conversor de PDF a Texto con Soporte de Tablas</h1>
+        
+        <div id="uploadArea" class="upload-area">
+            <i class="fas fa-file-pdf" style="font-size: 48px; color: #3498db;"></i>
+            <h3>Arrastra y suelta tu archivo PDF aquí</h3>
+            <p>o</p>
+            <button class="btn" onclick="document.getElementById('fileInput').click()">Seleccionar archivo</button>
+            <input type="file" id="fileInput" accept=".pdf" onchange="handleFileSelect(this.files)">
+            <div class="file-info" id="fileInfo"></div>
+        </div>
+        
+        <div style="text-align: center;">
+            <button id="convertBtn" class="btn" disabled onclick="convertPdf()">Convertir a Texto</button>
+        </div>
+        
+        <div id="status"></div>
+        
+        <div class="features">
+            <h3>Características:</h3>
+            <ul>
+                <li>Convierte documentos PDF a texto plano</li>
+                <li>Preserva la estructura de las tablas en el resultado</li>
+                <li>Procesamiento rápido y eficiente</li>
+                <li>Soporte para documentos de múltiples páginas</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let selectedFile = null;
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const convertBtn = document.getElementById('convertBtn');
+        const fileInfo = document.getElementById('fileInfo');
+        const statusDiv = document.getElementById('status');
+
+        // Eventos para arrastrar y soltar
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight() {
+            uploadArea.classList.add('highlight');
+        }
+
+        function unhighlight() {
+            uploadArea.classList.remove('highlight');
+        }
+
+        // Manejar el archivo soltado
+        uploadArea.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFileSelect(files);
+        }
+
+        // Seleccionar archivo
+        function handleFileSelect(files) {
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.type === 'application/pdf') {
+                    selectedFile = file;
+                    fileInfo.innerHTML = `<strong>Archivo seleccionado:</strong> ${file.name} (${formatFileSize(file.size)})`;
+                    convertBtn.disabled = false;
+                    statusDiv.style.display = 'none';
+                } else {
+                    showStatus('Por favor, selecciona un archivo PDF válido.', 'error');
+                    resetFileInput();
+                }
+            }
+        }
+
+        // Convertir PDF
+        function convertPdf() {
+            if (!selectedFile) {
+                showStatus('Por favor, selecciona un archivo PDF primero.', 'error');
+                return;
+            }
+
+            showStatus('<div class="spinner"></div> Procesando el archivo PDF y preservando tablas...', 'loading');
+            convertBtn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            fetch('http://localhost:8000/convert', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => {
+                        throw new Error(err.detail || 'Error al procesar el PDF');
+                    });
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                // Crear un enlace para descargar el archivo
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                
+                // Obtener el nombre del archivo original y cambiar la extensión
+                const fileName = selectedFile.name.replace('.pdf', '.txt');
+                a.download = fileName;
+                
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                
+                showStatus('¡Conversión exitosa! El archivo de texto con tablas preservadas se ha descargado.', 'success');
+                resetFileInput();
+            })
+            .catch(error => {
+                showStatus(`Error: ${error.message}`, 'error');
+                convertBtn.disabled = false;
+            });
+        }
+
+        // Funciones auxiliares
+        function showStatus(message, type) {
+            statusDiv.innerHTML = message;
+            statusDiv.className = '';
+            statusDiv.classList.add(type);
+            statusDiv.style.display = 'block';
+        }
+
+        function resetFileInput() {
+            fileInput.value = '';
+            selectedFile = null;
+            fileInfo.innerHTML = '';
+            convertBtn.disabled = true;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+    </script>
+</body>
+</html>

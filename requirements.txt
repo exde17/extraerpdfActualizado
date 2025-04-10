@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+python-multipart
+pdfminer.six
+pandas
+tabula-py
+PyMuPDF
+aiofiles
+camelot-py
+opencv-python
+ghostscript
